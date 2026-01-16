@@ -34,124 +34,81 @@ funds_raised_millions – Total funds raised (in millions)
 
 🚀 Project Setup
 
-Database Creation:
-Created a new schema named world_layoffs.
+>> Database Creation:
+   Created a new schema named world_layoffs.
 
-Data Import:
-Imported the raw dataset using Table Data Import Wizard into a table named layoffs.
+>> Data Import:
+   Imported the raw dataset using Table Data Import Wizard into a table named layoffs.
 
-Staging Table:
-To protect the raw data, created a copy of the table called layoffs_staging (later referred to as layoffs_staging_2).
-
+>> Staging Table:
+   To protect the raw data, created a copy of the table called layoffs_staging (later referred to as layoffs_staging_2).
 ⚠️ All cleaning operations were performed only on the staging table.
+
 
 ⚙️ Data Cleaning Methodology
 
-The cleaning process followed a four-step framework:
+   The cleaning process followed a four-step framework:
 
-Step 1: Removing Duplicates
+>> Step 1: Removing Duplicates
 
-The dataset lacked a unique row ID, making duplicates harder to handle.
+  - The dataset lacked a unique row ID, making duplicates harder to handle.
+  - Identification:
+    Used ROW_NUMBER() window function partitioned by all columns (company, location, industry, total_laid_off, percentage_laid_off, date, stage, country, funds_raised_millions) to assign row numbers.
+    Rows with row_num > 1 were marked as duplicates.
 
-Identification:
-Used ROW_NUMBER() window function partitioned by all columns
-(company, location, industry, total_laid_off, percentage_laid_off, date, stage, country, funds_raised_millions)
-to assign row numbers.
-Rows with row_num > 1 were marked as duplicates.
+  - Deletion Workaround:
+    Since MySQL doesn’t allow deletion directly from a CTE, Created a temporary table layoffs_staging_2 with an extra row_num column. Inserted all rows (including the calculated row_num) into the new table.    Deleted all rows where row_num > 1.
 
-Deletion Workaround:
-Since MySQL doesn’t allow deletion directly from a CTE:
+>> Step 2: Standardizing Data (Standardized formatting, spelling, and structure across columns.)
 
-Created a temporary table layoffs_staging_2 with an extra row_num column.
-
-Inserted all rows (including the calculated row_num) into the new table.
-
-Deleted all rows where row_num > 1.
-
-Step 2: Standardizing Data
-
-Standardized formatting, spelling, and structure across columns.
-
-Trimming Whitespace:
-Used TRIM() to remove leading/trailing spaces from the company column
-(e.g., " Airbnb" → "Airbnb").
-
+ - Trimming Whitespace: Used TRIM() to remove leading/trailing spaces from the company column (e.g., " Airbnb" → "Airbnb").
 💡 In MySQL Workbench, you may need to disable Safe Updates under SQL Editor Preferences to allow UPDATE/DELETE without a key.
 
-Industry Consolidation:
-Merged similar values for consistency.
+ - Industry Consolidation: Merged similar values for consistency, e.g., 'crypto', 'cryptocurrency', 'c-r-ypt' → 'Crypto'
 
-e.g., 'crypto', 'cryptocurrency', 'c-r-ypt' → 'Crypto'
+ - Country Formatting: Removed trailing periods, e.g., 'United States.' → 'United States' using TRIM(TRAILING '.' FROM country)
 
-Country Formatting:
-Removed trailing periods:
+ - Date Conversion: Converted the date column (originally stored as text) to proper MySQL DATE format: STR_TO_DATE(date, '%m/%d/%Y'). Then altered the column type:
 
-e.g., 'United States.' → 'United States' using
+                     ALTER TABLE layoffs_staging_2 
+                     MODIFY COLUMN date DATE;
 
-TRIM(TRAILING '.' FROM country)
+>> Step 3: Handling Null and Blank Values (Addressed missing data for accuracy and reliability.)
 
+ - Industry Column: Converted blank industry values to NULL for consistent handling.Used a self-join on company and location to fill NULL industries. If one row had a NULL industry but another row (same company & location) had a valid value, populated the NULL accordingly. Worked for companies like Airbnb and Carvana. Did not work for companies with only one record (e.g., Bailey’s).
 
-Date Conversion:
-Converted the date column (originally stored as text) to proper MySQL DATE format:
+ - Other Columns:Left columns like total_laid_off, percentage_laid_off, and funds_raised_millions as NULL due to lack of reliable information to populate them.
 
-STR_TO_DATE(date, '%m/%d/%Y')
+>> Step 4: Removing Unnecessary Columns and Rows
 
+ - Removing Rows: Deleted rows where both total_laid_off and percentage_laid_off were NULL (considered unreliable for analysis).
 
-Then altered the column type:
+ - Dropping Utility Column: Dropped the temporary row_num column:
 
-ALTER TABLE layoffs_staging_2 
-MODIFY COLUMN date DATE;
-
-Step 3: Handling Null and Blank Values
-
-Addressed missing data for accuracy and reliability.
-
-Industry Column:
-
-Converted blank industry values to NULL for consistent handling.
-
-Used a self-join on company and location to fill NULL industries:
-If one row had a NULL industry but another row (same company & location) had a valid value, populated the NULL accordingly.
-
-Worked for companies like Airbnb and Carvana.
-
-Did not work for companies with only one record (e.g., Bailey’s).
-
-Other Columns:
-Left columns like total_laid_off, percentage_laid_off, and funds_raised_millions as NULL due to lack of reliable information to populate them.
-
-Step 4: Removing Unnecessary Columns and Rows
-
-Removing Rows:
-Deleted rows where both total_laid_off and percentage_laid_off were NULL (considered unreliable for analysis).
-
-Dropping Utility Column:
-Dropped the temporary row_num column:
-
-ALTER TABLE layoffs_staging_2 
-DROP COLUMN row_num;
+      ALTER TABLE layoffs_staging_2 
+      DROP COLUMN row_num;
 
 
 
 📈 Results
 
-The final cleaned dataset:
+>> The final cleaned dataset:
 
-Removed duplicates and irrelevant rows
+ - Removed duplicates and irrelevant rows
 
-Standardized formats for industries, countries, and dates
+ - Standardized formats for industries, countries, and dates
 
-Addressed missing industry fields
+ - Addressed missing industry fields
 
-Preserved only accurate and analysis-ready data
+ - Preserved only accurate and analysis-ready data
 
 This cleaned dataset is now ready for EDA and visualization in tools such as Python, Tableau, or Power BI.
 
 ⚙️ Requirements
 
-MySQL 8.0+
+ - MySQL 8.0+
 
-MySQL Workbench
+ - MySQL Workbench
 
 
 
